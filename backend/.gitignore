@@ -132,3 +132,15 @@ credentials/
 # ===============================================
 docs/.vitepress/dist
 docs/.vitepress/cache
+
+verify-rbac.sh
+test-api.sh
+
+# ===============================================
+# LOCK FILES
+# ===============================================
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+markdown reference
