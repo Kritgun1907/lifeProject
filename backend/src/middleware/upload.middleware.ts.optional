@@ -1,0 +1,160 @@
+import multer, { FileFilterCallback } from "multer";
+import path from "path";
+import fs from "fs";
+import { Request } from "express";
+import { ValidationError } from "../errors";
+
+/**
+ * ===============================================
+ * FILE UPLOAD MIDDLEWARE (MULTER)
+ * ===============================================
+ */
+
+// Allowed file types
+const ALLOWED_MIME_TYPES = {
+  IMAGE: ["image/jpeg", "image/png", "image/gif", "image/webp"],
+  AUDIO: ["audio/mpeg", "audio/wav", "audio/ogg"],
+  VIDEO: ["video/mp4", "video/webm", "video/quicktime"],
+  DOCUMENT: [
+    "application/pdf",
+    "application/msword",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "application/vnd.ms-excel",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "text/plain",
+  ],
+};
+
+const ALL_ALLOWED_TYPES = [
+  ...ALLOWED_MIME_TYPES.IMAGE,
+  ...ALLOWED_MIME_TYPES.AUDIO,
+  ...ALLOWED_MIME_TYPES.VIDEO,
+  ...ALLOWED_MIME_TYPES.DOCUMENT,
+];
+
+// Max file sizes (in bytes)
+const MAX_FILE_SIZE = {
+  IMAGE: 5 * 1024 * 1024, // 5MB
+  AUDIO: 10 * 1024 * 1024, // 10MB
+  VIDEO: 50 * 1024 * 1024, // 50MB
+  DOCUMENT: 10 * 1024 * 1024, // 10MB
+};
+
+/**
+ * Configure storage (local filesystem)
+ * For production, use cloud storage (S3, Cloudinary, etc.)
+ */
+const storage = multer.diskStorage({
+  destination: (req: Request, file: Express.Multer.File, cb: (error: Error | null, destination: string) => void) => {
+    const uploadDir = path.join(__dirname, "../../uploads");
+
+    // Create uploads directory if it doesn't exist
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+
+    cb(null, uploadDir);
+  },
+  filename: (req: Request, file: Express.Multer.File, cb: (error: Error | null, filename: string) => void) => {
+    // Generate unique filename: timestamp-random-originalname
+    const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
+    const ext = path.extname(file.originalname);
+    const basename = path.basename(file.originalname, ext);
+    const sanitizedBasename = basename.replace(/[^a-zA-Z0-9]/g, "_");
+
+    cb(null, `${sanitizedBasename}-${uniqueSuffix}${ext}`);
+  },
+});
+
+/**
+ * File filter to validate file types
+ */
+const fileFilter = (
+  req: Request,
+  file: Express.Multer.File,
+  cb: FileFilterCallback
+): void => {
+  if (ALL_ALLOWED_TYPES.includes(file.mimetype)) {
+    cb(null, true); // Accept file
+  } else {
+    cb(
+      new ValidationError(
+        `Invalid file type: ${file.mimetype}. Allowed types: images, audio, video, documents`
+      )
+    );
+  }
+};
+
+/**
+ * Multer configuration
+ */
+export const upload = multer({
+  storage,
+  fileFilter,
+  limits: {
+    fileSize: MAX_FILE_SIZE.VIDEO, // Use max size across all types
+    files: 10, // Max 10 files per request
+  },
+});
+
+/**
+ * Middleware to validate file sizes based on type
+ */
+export const validateFileSizes = (
+  req: Request & { files?: Express.Multer.File[] },
+  res: any,
+  next: any
+): void => {
+  if (!req.files || req.files.length === 0) {
+    return next();
+  }
+
+  try {
+    for (const file of req.files) {
+      let maxSize = MAX_FILE_SIZE.DOCUMENT;
+
+      if (file.mimetype.startsWith("image/")) {
+        maxSize = MAX_FILE_SIZE.IMAGE;
+      } else if (file.mimetype.startsWith("audio/")) {
+        maxSize = MAX_FILE_SIZE.AUDIO;
+      } else if (file.mimetype.startsWith("video/")) {
+        maxSize = MAX_FILE_SIZE.VIDEO;
+      }
+
+      if (file.size > maxSize) {
+        throw new ValidationError(
+          `File ${file.originalname} exceeds maximum size of ${maxSize / (1024 * 1024)}MB`
+        );
+      }
+    }
+
+    next();
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Helper to get attachment type from MIME type
+ */
+export function getAttachmentType(mimeType: string): "IMAGE" | "AUDIO" | "VIDEO" | "DOCUMENT" | "LINK" {
+  if (mimeType.startsWith("image/")) return "IMAGE";
+  if (mimeType.startsWith("audio/")) return "AUDIO";
+  if (mimeType.startsWith("video/")) return "VIDEO";
+  return "DOCUMENT";
+}
+
+/**
+ * Helper to delete uploaded files (cleanup on error)
+ */
+export function deleteUploadedFiles(files: Express.Multer.File[]): void {
+  files.forEach((file) => {
+    try {
+      if (fs.existsSync(file.path)) {
+        fs.unlinkSync(file.path);
+      }
+    } catch (error) {
+      console.error(`Failed to delete file ${file.path}:`, error);
+    }
+  });
+}
