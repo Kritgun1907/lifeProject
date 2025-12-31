@@ -9,12 +9,12 @@
 import jwt, { SignOptions, Secret } from "jsonwebtoken";
 
 // Environment variables
-const ACCESS_TOKEN_SECRET = process.env.JWT_SECRET!;
-const REFRESH_TOKEN_SECRET = process.env.REFRESH_TOKEN_SECRET || process.env.JWT_SECRET!;
+const ACCESS_TOKEN_SECRET = process.env.JWT_ACCESS_SECRET!;
+const REFRESH_TOKEN_SECRET = process.env.JWT_REFRESH_SECRET || process.env.JWT_ACCESS_SECRET!;
 
 // Token TTLs - configurable via env (cast to any for SignOptions compatibility)
-const ACCESS_TOKEN_TTL: any = process.env.ACCESS_TOKEN_TTL || "15m";
-const REFRESH_TOKEN_TTL: any = process.env.REFRESH_TOKEN_TTL || "7d";
+const ACCESS_TOKEN_TTL: any = process.env.JWT_ACCESS_EXPIRY || "15m";
+const REFRESH_TOKEN_TTL: any = process.env.JWT_REFRESH_EXPIRY || "7d";
 
 /**
  * Token payload interface
@@ -32,7 +32,7 @@ export interface TokenPayload {
  */
 export function signAccessToken(payload: Omit<TokenPayload, "type">): string {
   if (!ACCESS_TOKEN_SECRET) {
-    throw new Error("JWT_SECRET is not defined in environment variables");
+    throw new Error("JWT_ACCESS_SECRET is not defined in environment variables");
   }
 
   const tokenPayload: TokenPayload = {
@@ -73,7 +73,7 @@ export function signRefreshToken(payload: Pick<TokenPayload, "sub" | "tokenVersi
  */
 export function verifyAccessToken(token: string): TokenPayload {
   if (!ACCESS_TOKEN_SECRET) {
-    throw new Error("JWT_SECRET is not defined in environment variables");
+    throw new Error("JWT_ACCESS_SECRET is not defined in environment variables");
   }
 
   return jwt.verify(token, ACCESS_TOKEN_SECRET) as TokenPayload;

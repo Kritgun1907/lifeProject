@@ -15,5 +15,6 @@ connectDB();
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log(`📝 Environment: ${process.env.NODE_ENV || "development"}`);
-  console.log(`🔐 JWT_SECRET loaded: ${process.env.JWT_SECRET ? '✅ YES' : '❌ NO'}`);
+  console.log(`🔐 JWT_ACCESS_SECRET loaded: ${process.env.JWT_ACCESS_SECRET ? '✅ YES' : '❌ NO'}`);
+  console.log(`🔐 JWT_REFRESH_SECRET loaded: ${process.env.JWT_REFRESH_SECRET ? '✅ YES' : '❌ NO'}`);
 });
